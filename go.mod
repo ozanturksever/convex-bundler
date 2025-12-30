@@ -1,4 +1,4 @@
-module convex-bundler
+module github.com/ozanturksever/convex-bundler
 
 go 1.25.4
 
@@ -7,6 +7,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
+	modernc.org/sqlite v1.42.2
 )
 
 require (
@@ -73,5 +74,4 @@ require (
 	modernc.org/libc v1.66.10 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.42.2 // indirect
 )

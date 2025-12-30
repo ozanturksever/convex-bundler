@@ -11,9 +11,11 @@ convex-bundler
 
 # Output of the go coverage tool
 *.out
+coverage.html
 
 # Go workspace file
 go.work
+go.work.sum
 
 # Dependency directories
 vendor/
@@ -26,18 +28,31 @@ vendor/
 
 # OS
 .DS_Store
+Thumbs.db
 
 # Build outputs
 /build/
 /dist/
 /output/
+/bin/
 
 # Temporary files
 /tmp/
 *.tmp
+*.log
 
 # Node modules in test data
 testdata/**/node_modules/
 testdata/**/_generated/
-/output/
-/bin/
+testdata/**/package-lock.json
+
+# Devenv / Nix
+.devenv/
+.devenv.flake.nix
+devenv.lock
+.direnv/
+
+# Environment files
+.env
+.env.local
+.envrc
