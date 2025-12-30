@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"convex-bundler/pkg/credentials"
-	"convex-bundler/pkg/manifest"
+	"github.com/ozanturksever/convex-bundler/pkg/credentials"
+	"github.com/ozanturksever/convex-bundler/pkg/manifest"
 )
 
 func TestCreate(t *testing.T) {

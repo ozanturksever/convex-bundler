@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"convex-bundler/pkg/credentials"
-	"convex-bundler/pkg/manifest"
+	"github.com/ozanturksever/convex-bundler/pkg/credentials"
+	"github.com/ozanturksever/convex-bundler/pkg/manifest"
 )
 
 // Options for creating a bundle

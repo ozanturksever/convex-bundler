@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"convex-bundler/pkg/bundle"
-	"convex-bundler/pkg/cli"
-	"convex-bundler/pkg/credentials"
-	"convex-bundler/pkg/manifest"
-	"convex-bundler/pkg/predeploy"
-	"convex-bundler/pkg/version"
+	"github.com/ozanturksever/convex-bundler/pkg/bundle"
+	"github.com/ozanturksever/convex-bundler/pkg/cli"
+	"github.com/ozanturksever/convex-bundler/pkg/credentials"
+	"github.com/ozanturksever/convex-bundler/pkg/manifest"
+	"github.com/ozanturksever/convex-bundler/pkg/predeploy"
+	"github.com/ozanturksever/convex-bundler/pkg/version"
 )
 
 func main() {
