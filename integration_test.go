@@ -120,10 +120,23 @@ func TestIntegration_FullBundleWorkflow(t *testing.T) {
 
 // TestIntegration_VersionDetection_PackageJSON tests version detection from package.json
 func TestIntegration_VersionDetection_PackageJSON(t *testing.T) {
-	// Test with no CLI override - should read from package.json
-	detectedVersion, err := version.Detect("testdata/sample-app", "")
+	// Copy testdata to a temp directory to isolate from git tags
+	// (git tags have higher priority than package.json)
+	tmpDir := t.TempDir()
+	appDir := filepath.Join(tmpDir, "sample-app")
+	err := os.MkdirAll(appDir, 0755)
 	require.NoError(t, err)
-	assert.Equal(t, "1.2.3", detectedVersion) // From testdata/sample-app/package.json
+
+	// Copy package.json to temp directory
+	srcData, err := os.ReadFile("testdata/sample-app/package.json")
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(appDir, "package.json"), srcData, 0644)
+	require.NoError(t, err)
+
+	// Test with no CLI override - should read from package.json
+	detectedVersion, err := version.Detect(appDir, "")
+	require.NoError(t, err)
+	assert.Equal(t, "1.2.3", detectedVersion) // From package.json
 }
 
 // TestIntegration_VersionDetection_CLIOverride tests that CLI version takes priority
