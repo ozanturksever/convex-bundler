@@ -12,6 +12,13 @@ import (
 	"github.com/ozanturksever/convex-bundler/pkg/version"
 )
 
+// Version information set by goreleaser ldflags
+var (
+	appVersion = "dev"
+	commit     = "unknown"
+	buildTime  = "unknown"
+)
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
