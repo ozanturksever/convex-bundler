@@ -9,6 +9,7 @@ import (
 	"github.com/ozanturksever/convex-bundler/pkg/credentials"
 	"github.com/ozanturksever/convex-bundler/pkg/manifest"
 	"github.com/ozanturksever/convex-bundler/pkg/predeploy"
+	"github.com/ozanturksever/convex-bundler/pkg/selfhost"
 	"github.com/ozanturksever/convex-bundler/pkg/version"
 )
 
@@ -28,13 +29,22 @@ func main() {
 		return
 	}
 
-	if err := run(); err != nil {
+	// Check if this is the selfhost subcommand
+	if cli.IsSelfHostCommand(os.Args) {
+		if err := runSelfHost(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(selfhost.ExitGeneralError)
+		}
+		return
+	}
+
+	if err := runBundle(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func runBundle() error {
 	// Parse CLI arguments
 	config, err := cli.Parse(os.Args)
 	if err != nil {
@@ -102,6 +112,43 @@ func run() error {
 	fmt.Println("  - storage/ (file storage)")
 	fmt.Println("  - manifest.json")
 	fmt.Println("  - credentials.json")
+
+	return nil
+}
+
+func runSelfHost() error {
+	// Parse selfhost CLI arguments (skip "convex-bundler" and "selfhost" from args)
+	config, err := cli.ParseSelfHost(os.Args[1:]) // Pass args starting from "selfhost"
+	if err != nil {
+		return fmt.Errorf("failed to parse arguments: %w", err)
+	}
+
+	fmt.Println("Creating self-extracting executable...")
+	fmt.Printf("  Bundle: %s\n", config.BundleDir)
+	fmt.Printf("  Ops Binary: %s\n", config.OpsBinary)
+	fmt.Printf("  Output: %s\n", config.Output)
+	fmt.Printf("  Platform: %s\n", config.Platform)
+	fmt.Printf("  Compression: %s\n", config.Compression)
+
+	// Create self-extracting executable
+	err = selfhost.Create(selfhost.CreateOptions{
+		BundleDir:   config.BundleDir,
+		OpsBinary:   config.OpsBinary,
+		OutputPath:  config.Output,
+		Platform:    config.Platform,
+		Compression: config.Compression,
+		OpsVersion:  config.OpsVersion,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create self-extracting executable: %w", err)
+	}
+
+	fmt.Printf("\nSelf-extracting executable created successfully at: %s\n", config.Output)
+	fmt.Println("\nThe executable supports the following commands:")
+	fmt.Println("  install    - Install from embedded bundle")
+	fmt.Println("  extract    - Extract embedded bundle to a directory")
+	fmt.Println("  info       - Display embedded bundle information")
+	fmt.Println("  verify     - Verify embedded bundle integrity")
 
 	return nil
 }
