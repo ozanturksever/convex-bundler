@@ -33,9 +33,41 @@ func Parse(args []string, opts ...ParseOptions) (*Config, error) {
 	config := &Config{}
 
 	cmd := &cobra.Command{
-		Use:   "convex-bundler",
+		Use:   "convex-bundler [flags]",
 		Short: "Bundle Convex apps with a backend binary",
-		Long:  "A CLI tool that bundles Convex apps and a pre-provided backend binary into a portable package.",
+		Long: `convex-bundler bundles Convex apps and a pre-provided backend binary into a 
+portable, self-contained package ready for deployment.
+
+The bundler performs the following steps:
+  1. Validates the Convex app directory and backend binary
+  2. Detects version from git tags, package.json, or CLI override
+  3. Runs pre-deployment to initialize the database with your schema
+  4. Generates secure credentials (admin key and instance secret)
+  5. Creates the final bundle with all necessary files
+
+The output bundle contains:
+  - backend         The Convex backend executable
+  - convex.db       Pre-initialized SQLite database
+  - storage/        File storage directory
+  - manifest.json   Bundle metadata
+  - credentials.json  Admin key and instance secret`,
+		Example: `  # Basic usage with required flags
+  convex-bundler --app ./my-app --output ./bundle --backend-binary ./convex-local-backend
+
+  # Bundle multiple apps
+  convex-bundler --app ./app1 --app ./app2 -o ./bundle --backend-binary ./backend
+
+  # Specify custom name and version
+  convex-bundler --app ./my-app -o ./bundle --backend-binary ./backend \
+    --name "My Convex App" --bundle-version 1.0.0
+
+  # Target ARM64 Linux platform
+  convex-bundler --app ./my-app -o ./bundle --backend-binary ./backend-arm64 \
+    --platform linux-arm64
+
+  # Use custom Docker image for pre-deployment
+  convex-bundler --app ./my-app -o ./bundle --backend-binary ./backend \
+    --docker-image ghcr.io/my-org/convex-predeploy:v1.0.0`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
