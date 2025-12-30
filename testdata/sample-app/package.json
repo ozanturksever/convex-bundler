@@ -1,0 +1,11 @@
+{
+  "name": "sample-convex-app",
+  "version": "1.2.3",
+  "private": true,
+  "scripts": {
+    "dev": "convex dev"
+  },
+  "dependencies": {
+    "convex": "^1.0.0"
+  }
+}
