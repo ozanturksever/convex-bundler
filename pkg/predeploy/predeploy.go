@@ -81,9 +81,17 @@ type Result struct {
 func Run(opts Options) (*Result, error) {
 	ctx := context.Background()
 
-	// Create output directories
-	databasePath := filepath.Join(opts.OutputDir, "convex.db")
-	storagePath := filepath.Join(opts.OutputDir, "storage")
+	// Create a temporary directory for pre-deployment output
+	// We use a temp directory because bundle.Create will copy from here to the final location
+	tempDir, err := os.MkdirTemp("", "convex-predeploy-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	// Note: We don't clean up tempDir here because the caller needs the files
+	// The caller should clean up after copying the files
+
+	databasePath := filepath.Join(tempDir, "convex.db")
+	storagePath := filepath.Join(tempDir, "storage")
 
 	if err := os.MkdirAll(storagePath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create storage directory: %w", err)
@@ -274,29 +282,100 @@ exit 1`, containerDBPath, instanceSecret, containerStoragePath)
 		}
 	}
 
-	// Verify the database file exists in the container before trying to copy it
-	exitCode, output, err = container.Exec(ctx, []string{"sh", "-c", fmt.Sprintf("ls -la %s", containerDBPath)})
+	// Verify the database file exists in the container and get its size
+	exitCode, output, err = container.Exec(ctx, []string{"sh", "-c", fmt.Sprintf("ls -la %s && stat -c %%s %s", containerDBPath, containerDBPath)})
 	if err != nil || exitCode != 0 {
 		return nil, fmt.Errorf("database file not found at %s: %v (exit code: %d, output: %s)", containerDBPath, err, exitCode, readOutput(output))
 	}
 
-	// Copy database out of container using CopyFileFromContainer
-	// This returns a tar stream that we need to extract
+	// Use CopyFileFromContainer to get the database
+	// This is more reliable than base64 encoding through exec
 	reader, err := container.CopyFileFromContainer(ctx, containerDBPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to copy database from container at %s: %w", containerDBPath, err)
+		return nil, fmt.Errorf("failed to copy database from container: %w", err)
 	}
 	defer reader.Close()
 
-	// Read the entire stream into a buffer first to avoid issues with partial reads
-	buf, err := io.ReadAll(reader)
+	// Read the tar stream
+	tarData, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read tar stream: %w", err)
+		return nil, fmt.Errorf("failed to read tar data: %w", err)
 	}
 
-	// Extract file from tar archive
-	if err := extractTarFile(bytes.NewReader(buf), databasePath); err != nil {
-		return nil, fmt.Errorf("failed to extract database: %w", err)
+	if len(tarData) == 0 {
+		return nil, fmt.Errorf("received empty tar data from container")
+	}
+
+	// Extract the database from the tar archive
+	if err := extractTarFile(bytes.NewReader(tarData), databasePath); err != nil {
+		return nil, fmt.Errorf("failed to extract database from tar: %w", err)
+	}
+
+	// Verify the extracted database
+	dbInfo, err := os.Stat(databasePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat extracted database: %w", err)
+	}
+	if dbInfo.Size() == 0 {
+		return nil, fmt.Errorf("extracted database is empty")
+	}
+
+	// Copy storage files from container
+	// First list what files exist in storage
+	exitCode, listOutput, _ := container.Exec(ctx, []string{"sh", "-c", fmt.Sprintf("find %s -type f 2>/dev/null", containerStoragePath)})
+	if exitCode == 0 {
+		fileList := strings.TrimSpace(readOutput(listOutput))
+		// Remove docker control characters
+		fileList = strings.Map(func(r rune) rune {
+			if r < 32 && r != '\n' {
+				return -1
+			}
+			return r
+		}, fileList)
+		
+		if fileList != "" {
+			fileCount := strings.Count(fileList, "\n") + 1
+			fmt.Printf("Storage files in container: %d files\n", fileCount)
+			
+			// Create tar of storage directory inside container
+			const storageTarPath = "/tmp/storage.tar"
+			exitCode, _, _ := container.Exec(ctx, []string{"sh", "-c", fmt.Sprintf(
+				"cd %s && tar -cf %s .",
+				containerStoragePath, storageTarPath,
+			)})
+			if exitCode == 0 {
+				// Copy the tar file from container
+				// CopyFileFromContainer returns the tar file content directly as a tar stream
+				// (not wrapped in another tar) - this is the actual storage.tar we created
+				tarReader, tarErr := container.CopyFileFromContainer(ctx, storageTarPath)
+				if tarErr != nil {
+					fmt.Printf("Warning: Failed to copy storage tar: %v\n", tarErr)
+				} else {
+					tarData, readErr := io.ReadAll(tarReader)
+					tarReader.Close()
+					
+					if readErr != nil {
+						fmt.Printf("Warning: Failed to read storage tar: %v\n", readErr)
+					} else if len(tarData) > 0 {
+						// The tarData IS the storage.tar content directly
+						// Extract the storage contents
+						if extractErr := extractTarDirectoryNoStrip(bytes.NewReader(tarData), storagePath); extractErr != nil {
+							fmt.Printf("Warning: Failed to extract storage contents: %v\n", extractErr)
+						} else {
+							// Count extracted files
+							var extractedCount int
+							filepath.Walk(storagePath, func(path string, info os.FileInfo, err error) error {
+								if err == nil && !info.IsDir() {
+									extractedCount++
+								}
+								return nil
+							})
+							fmt.Printf("Extracted %d storage files\n", extractedCount)
+						}
+					}
+				}
+			}
+		}
 	}
 
 	return &Result{
@@ -316,13 +395,83 @@ func readOutput(reader io.Reader) string {
 	return string(data)
 }
 
+// extractTarDirectoryNoStrip extracts all files from a tar stream to destDir
+// Unlike extractTarDirectory, this doesn't strip any root directory
+func extractTarDirectoryNoStrip(reader io.Reader, destDir string) error {
+	// Read all data first to handle potential padding issues
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return fmt.Errorf("failed to read tar data: %w", err)
+	}
+	
+	// Tar files are padded to 512-byte blocks, and may have trailing zeros
+	// Find the actual content by looking for the tar header magic
+	tr := tar.NewReader(bytes.NewReader(data))
+	var extractedCount int
 
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			// If we've already extracted some files, don't fail on trailing garbage
+			if extractedCount > 0 {
+				break
+			}
+			return fmt.Errorf("failed to read tar header: %w", err)
+		}
+
+		// Skip the current directory entry
+		if header.Name == "." || header.Name == "./" {
+			continue
+		}
+
+		// Clean the path
+		relPath := strings.TrimPrefix(header.Name, "./")
+		if relPath == "" {
+			continue
+		}
+
+		targetPath := filepath.Join(destDir, relPath)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(targetPath, 0755); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", targetPath, err)
+			}
+		case tar.TypeReg, 0:
+			// Ensure parent directory exists
+			parentDir := filepath.Dir(targetPath)
+			if err := os.MkdirAll(parentDir, 0755); err != nil {
+				return fmt.Errorf("failed to create parent directory %s: %w", parentDir, err)
+			}
+
+			// Read and write file content
+			fileContent, err := io.ReadAll(tr)
+			if err != nil {
+				return fmt.Errorf("failed to read file %s from tar: %w", header.Name, err)
+			}
+
+			if err := os.WriteFile(targetPath, fileContent, os.FileMode(header.Mode)); err != nil {
+				return fmt.Errorf("failed to write file %s: %w", targetPath, err)
+			}
+			extractedCount++
+		}
+	}
+
+	return nil
+}
 // extractTarFile extracts a single file from a tar stream and writes it to destPath
 func extractTarFile(reader io.Reader, destPath string) error {
-	// Read first few bytes to check if it's actually a tar file
+	// Read all data from the reader
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return fmt.Errorf("failed to read data: %w", err)
+	}
+
+	if len(data) == 0 {
+		return fmt.Errorf("received empty data from container")
 	}
 
 	// Check for tar magic bytes (at offset 257: "ustar")
@@ -355,19 +504,22 @@ func extractTarFile(reader io.Reader, destPath string) error {
 
 		// Accept both regular files and type flag 0 (which some tar implementations use)
 		if header.Typeflag == tar.TypeReg || header.Typeflag == 0 {
-			outFile, err := os.Create(destPath)
-			if err != nil {
-				return fmt.Errorf("failed to create output file: %w", err)
+			// Read the file content from the tar
+			fileContent, readErr := io.ReadAll(tr)
+			if readErr != nil {
+				return fmt.Errorf("failed to read file from tar: %w", readErr)
 			}
 
-			_, copyErr := io.Copy(outFile, tr)
-			outFile.Close()
-			if copyErr != nil {
-				return fmt.Errorf("failed to write file content: %w", copyErr)
+			if len(fileContent) == 0 {
+				return fmt.Errorf("extracted empty file from tar (header size: %d)", header.Size)
+			}
+
+			if err := os.WriteFile(destPath, fileContent, 0644); err != nil {
+				return fmt.Errorf("failed to write file: %w", err)
 			}
 			return nil
 		}
 	}
 
-	return fmt.Errorf("no regular file found in tar archive")
+	return fmt.Errorf("no regular file found in tar archive (data size: %d bytes)", len(data))
 }

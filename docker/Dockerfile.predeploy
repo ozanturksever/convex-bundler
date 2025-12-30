@@ -1,0 +1,30 @@
+# Dockerfile for Convex pre-deployment
+# Uses Ubuntu 24.04 which has GLIBC 2.39 required by convex-local-backend
+# This image is used by convex-bundler to run 'npx convex deploy' during bundle creation
+
+FROM ubuntu:24.04
+
+# Install required packages
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+        gnupg \
+        unzip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 20.x
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install convex CLI globally
+RUN npm install -g convex
+
+# Create working directory
+WORKDIR /app
+
+# Default command
+CMD ["sleep", "infinity"]
