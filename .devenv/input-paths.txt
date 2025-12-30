@@ -1,7 +1,0 @@
-/Users/ozant/devel/tries/2025-12-29-convex-app-bundler/.devenv/flake.json
-/Users/ozant/devel/tries/2025-12-29-convex-app-bundler/.devenv.flake.nix
-/Users/ozant/devel/tries/2025-12-29-convex-app-bundler/.env
-/Users/ozant/devel/tries/2025-12-29-convex-app-bundler/devenv.local.nix
-/Users/ozant/devel/tries/2025-12-29-convex-app-bundler/devenv.lock
-/Users/ozant/devel/tries/2025-12-29-convex-app-bundler/devenv.nix
-/Users/ozant/devel/tries/2025-12-29-convex-app-bundler/devenv.yaml
