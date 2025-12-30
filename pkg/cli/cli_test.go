@@ -43,7 +43,7 @@ func TestParse_AllFlags(t *testing.T) {
 		"--output", "/out",
 		"--backend-binary", "/backend",
 		"--name", "My Backend",
-		"--version", "1.2.3",
+		"--bundle-version", "1.2.3",
 		"--platform", "linux-arm64",
 	}
 

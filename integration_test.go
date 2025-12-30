@@ -42,7 +42,7 @@ func TestIntegration_FullBundleWorkflow(t *testing.T) {
 		"--output", outputDir,
 		"--backend-binary", "/placeholder", // Placeholder for CLI parsing test
 		"--name", "Test Backend",
-		"--version", "2.0.0",
+		"--bundle-version", "2.0.0",
 		"--platform", "linux-x64",
 	}
 

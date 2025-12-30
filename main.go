@@ -20,6 +20,14 @@ var (
 )
 
 func main() {
+	// Check for version flag early
+	if len(os.Args) == 2 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
+		fmt.Printf("convex-bundler %s\n", appVersion)
+		fmt.Printf("  commit: %s\n", commit)
+		fmt.Printf("  built:  %s\n", buildTime)
+		return
+	}
+
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

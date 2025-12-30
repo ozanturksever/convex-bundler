@@ -47,7 +47,7 @@ func Parse(args []string, opts ...ParseOptions) (*Config, error) {
 	cmd.Flags().StringVarP(&config.Output, "output", "o", "", "Output path for the bundle directory")
 	cmd.Flags().StringVar(&config.BackendBinary, "backend-binary", "", "Path to the convex-local-backend binary")
 	cmd.Flags().StringVar(&config.Name, "name", "Convex Backend", "Display name")
-	cmd.Flags().StringVar(&config.Version, "version", "", "Version override (semver)")
+	cmd.Flags().StringVar(&config.Version, "bundle-version", "", "Bundle version override (semver)")
 	cmd.Flags().StringVar(&config.Platform, "platform", "linux-x64", "Target platform: linux-x64, linux-arm64")
 	cmd.Flags().StringVar(&config.DockerImage, "docker-image", "", "Docker image for pre-deployment (default: convex-predeploy:latest)")
 
