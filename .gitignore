@@ -56,3 +56,6 @@ devenv.lock
 .env
 .env.local
 .envrc
+
+# Test output directories
+test-selfhost-output/

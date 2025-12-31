@@ -140,3 +140,8 @@ docker-build:
 
 ## check: Run all checks (fmt, vet, lint, test)
 check: fmt vet lint test
+
+## test-e2e: Run the selfhost e2e test script
+test-e2e:
+	@echo "Running selfhost e2e test..."
+	./scripts/test-selfhost-e2e.sh
